@@ -1,0 +1,22 @@
+# 编译输出
+Debug/
+Release/
+build/
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+
+# Keil 相关文件
+*.uvguix.*
+*.uvoptx
+
+# STM32CubeIDE / Eclipse 相关
+.settings/
+*.launch
+
+# 其他临时文件
+*.log
+*.tmp
+.DS_Store
