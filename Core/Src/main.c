@@ -142,6 +142,7 @@ int main(void)
 		Gesture_Move();
 		
 		// 调试打印：每隔100次循环打印一次MPU6050四个手指和手背的角度
+    //增加了拇指角度的打印
 		if (++debug_print_cnt >= 1)
 		{
 			debug_print_cnt = 0;
