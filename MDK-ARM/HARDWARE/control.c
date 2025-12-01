@@ -1,8 +1,50 @@
-#include "control.h"
+﻿#include "control.h"
 int mode_start = 0;
 int mode1_flag = 0;
 int mode2_flag = 0;
 int mode3_flag = 0;
+
+typedef enum
+{
+    GESTURE_MODE_NONE = 0,
+    GESTURE_MODE_1,
+    GESTURE_MODE_2,
+    GESTURE_MODE_3
+} GestureMode;
+
+static void GestureMode_SetFlags(GestureMode mode)
+{
+    mode_start = (mode != GESTURE_MODE_NONE);
+    mode1_flag = (mode == GESTURE_MODE_1);
+    mode2_flag = (mode == GESTURE_MODE_2);
+    mode3_flag = (mode == GESTURE_MODE_3);
+}
+
+static GestureMode GestureMode_DetectFromAngles(void)
+{
+    if (mpu_data[3].filter_angle_x > 30 &&
+        mpu_data[2].filter_angle_x < 0 &&
+        mpu_data[1].filter_angle_x < 0 &&
+        mpu_data[0].filter_angle_x < 0)
+    {
+        return GESTURE_MODE_1;
+    }
+    if (mpu_data[3].filter_angle_x > 30 &&
+        mpu_data[2].filter_angle_x > 30 &&
+        mpu_data[1].filter_angle_x < 0 &&
+        mpu_data[0].filter_angle_x < 0)
+    {
+        return GESTURE_MODE_2;
+    }
+    if (mpu_data[3].filter_angle_x > 30 &&
+        mpu_data[2].filter_angle_x < 0 &&
+        mpu_data[1].filter_angle_x < 0 &&
+        mpu_data[0].filter_angle_x > 30)
+    {
+        return GESTURE_MODE_3;
+    }
+    return GESTURE_MODE_NONE;
+}
 /*
 层级1：判断是否握拳
 层级2：判断判断加速度大小，是否开始运动
@@ -74,33 +116,10 @@ void Gesture_Control_pro(void)
     }
     angle_diff_avg /= FINGER_SENSOR_COUNT;
 		
-		if(mpu_data[3].filter_angle_x> 30 && mpu_data[2].filter_angle_x <0 && mpu_data[1].filter_angle_x<0 && mpu_data[0].filter_angle_x<0)
-		{	
-			mode_start = 1;	
-			mode1_flag = 1;				//开启模式1
-			mode2_flag = 0;				//清零模式2
-			mode3_flag = 0;
-		}
-		else if(mpu_data[3].filter_angle_x> 30 && mpu_data[2].filter_angle_x >30 && mpu_data[1].filter_angle_x<0 && mpu_data[0].filter_angle_x<0)
-		{	
-			mode_start = 1;
-			mode2_flag = 1;				//开启模式2
-			mode1_flag = 0;				//清零模式1
-			mode3_flag = 0;
-		}
-		else if(mpu_data[3].filter_angle_x> 30 && mpu_data[2].filter_angle_x < 0 && mpu_data[1].filter_angle_x<0 && mpu_data[0].filter_angle_x>30)
-		{	
-			mode_start = 1;
-			mode3_flag = 1;				//开启模式3
-			mode1_flag = 0;				//清零模式1
-			mode2_flag = 0;
-		}
-		else
+		GestureMode detected_mode = GestureMode_DetectFromAngles();
+		GestureMode_SetFlags(detected_mode);
+		if(detected_mode == GESTURE_MODE_NONE)
 		{
-			mode_start = 0;
-			mode1_flag = 0;
-			mode2_flag = 0;				//全部清零
-			mode3_flag = 0;
 			float diff_span = hand_open_ref - hand_closed_ref;
 			if (diff_span < HAND_MIN_DIFF)
 			{
@@ -137,6 +156,10 @@ void Gesture_Control_pro(void)
 							HandThreshold_Clamp();
 					}
 			}
+		}
+		else
+		{
+			return;
 		}
 
     // 调试打印（可选）
@@ -194,7 +217,11 @@ typedef struct {
     float delta_x_history[FILTER_WINDOW_SIZE];  // X轴差值历史
     float delta_y_history[FILTER_WINDOW_SIZE];  // Y轴差值历史
     float delta_z_history[FILTER_WINDOW_SIZE];  // Z轴差值历史
-    uint8_t filter_index;      // 滤波窗口索引
+
+    uint8_t filter_index_x;    // X轴滤波窗口索引
+
+    uint8_t filter_index_y;    // Y轴滤波窗口索引
+    uint8_t filter_index_z;    // Z轴滤波窗口索引
     
     // 初始化和校准状态
     uint8_t is_initialized;    // 初始化标志（0：未初始化，1：已初始化）
@@ -228,6 +255,8 @@ static MoveDirection GestureMove_DetectDirection(GestureMoveState *state, float 
 static void GestureMove_UpdateDirection(GestureMoveState *state, MoveDirection new_dir);
 static void GestureMove_MapToCommand(GestureMoveState *state, float filt_acc_x, float filt_acc_y, float decay, float acc_num);
 static void GestureMove_ResetMotion(GestureMoveState *state);
+static uint8_t GestureMove_DirectionToCommand(MoveDirection dir);
+static void GestureMove_TransmitCommand(uint8_t cmd);
 
 static void GestureMove_ResetMotion(GestureMoveState *state)
 {
@@ -237,6 +266,9 @@ static void GestureMove_ResetMotion(GestureMoveState *state)
     state->hpf_acc_y = 0.0f;
     state->current_dir = DIR_NONE;
     state->dir_stable_cnt = 0;
+    state->filter_index_x = 0;
+    state->filter_index_y = 0;
+    state->filter_index_z = 0;
     for (uint8_t i = 0; i < FILTER_WINDOW_SIZE; i++)
     {
         state->delta_x_history[i] = 0.0f;
@@ -259,7 +291,7 @@ static float weighted_filter_internal(float history[], float new_val, uint8_t wi
     history[*filter_index] = new_val;
     
     // 计算加权平均值（近期数据权重相等）
-    float weights[FILTER_WINDOW_SIZE] = {0.2f, 0.2f, 0.2f, 0.2f, 0.2f};
+    static const float weights[FILTER_WINDOW_SIZE] = {0.2f, 0.2f, 0.2f, 0.2f, 0.2f};
     float sum = 0.0f;
     float weight_sum = 0.0f;
     
@@ -301,7 +333,9 @@ static void GestureMove_Init(GestureMoveState *state)
     state->vel_y = 0.0f;
     state->hpf_acc_x = 0.0f;
     state->hpf_acc_y = 0.0f;
-    state->filter_index = 0;
+    state->filter_index_x = 0;
+    state->filter_index_y = 0;
+    state->filter_index_z = 0;
     
     // 启动稳定期计时
     state->init_stable_time = HAL_GetTick();
@@ -400,9 +434,9 @@ static void GestureMove_ProcessAcceleration(GestureMoveState *state, float acc_x
  */
 static void GestureMove_FilterAcceleration(GestureMoveState *state, float *filt_acc_x, float *filt_acc_y, float *filt_acc_z)
 {
-    *filt_acc_x = weighted_filter_internal(state->delta_x_history, state->hpf_acc_x, FILTER_WINDOW_SIZE, &state->filter_index);
-    *filt_acc_y = weighted_filter_internal(state->delta_y_history, state->hpf_acc_y, FILTER_WINDOW_SIZE, &state->filter_index);
-    *filt_acc_z = weighted_filter_internal(state->delta_z_history, state->last_acc_z, FILTER_WINDOW_SIZE, &state->filter_index);
+    *filt_acc_x = weighted_filter_internal(state->delta_x_history, state->hpf_acc_x, FILTER_WINDOW_SIZE, &state->filter_index_x);
+    *filt_acc_y = weighted_filter_internal(state->delta_y_history, state->hpf_acc_y, FILTER_WINDOW_SIZE, &state->filter_index_y);
+    *filt_acc_z = weighted_filter_internal(state->delta_z_history, state->last_acc_z, FILTER_WINDOW_SIZE, &state->filter_index_z);
 }
 
 /**

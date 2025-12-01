@@ -3,7 +3,7 @@
 <title>Static Call Graph - [shoutao\shoutao.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image shoutao\shoutao.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6190004: Last Updated: Fri Nov 28 16:57:13 2025
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6190004: Last Updated: Mon Dec  1 16:39:41 2025
 <BR><P>
 <H3>Maximum Stack Usage =        200 bytes + Unknown(Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -601,12 +601,14 @@ Global Symbols
 <LI><a href="#[bd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;MX_ADC3_Init
 </UL>
 
-<P><STRONG><a name="[d2]"></a>Gesture_Control_pro</STRONG> (Thumb, 588 bytes, Stack size 0 bytes, control.o(.text.Gesture_Control_pro))
-<BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
+<P><STRONG><a name="[d2]"></a>Gesture_Control_pro</STRONG> (Thumb, 592 bytes, Stack size 8 bytes, control.o(.text.Gesture_Control_pro))
+<BR><BR>[Stack]<UL><LI>Max Depth = 8<LI>Call Chain = Gesture_Control_pro
+</UL>
+<BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[79]"></a>Gesture_Move</STRONG> (Thumb, 1500 bytes, Stack size 16 bytes, control.o(.text.Gesture_Move))
-<BR><BR>[Stack]<UL><LI>Max Depth = 40<LI>Call Chain = Gesture_Move &rArr; HAL_UART_Transmit
+<P><STRONG><a name="[79]"></a>Gesture_Move</STRONG> (Thumb, 1532 bytes, Stack size 24 bytes, control.o(.text.Gesture_Move))
+<BR><BR>[Stack]<UL><LI>Max Depth = 48<LI>Call Chain = Gesture_Move &rArr; HAL_UART_Transmit
 </UL>
 <BR>[Calls]<UL><LI><a href="#[7a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_GetTick
 <LI><a href="#[7c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Transmit
